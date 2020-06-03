@@ -123,7 +123,8 @@ FOUNDATION_EXPORT id AFJSONObjectByRemovingKeysWithNullValues(id JSONObject, NSJ
  */
 @property (nonatomic, assign) NSJSONReadingOptions readingOptions;
 
-/**
+/**  从响应的JSON数据中删除带有“NSNull”值的键
+
  Whether to remove keys with `NSNull` values from response JSON. Defaults to `NO`.
  */
 @property (nonatomic, assign) BOOL removesKeysWithNullValues;
@@ -245,6 +246,7 @@ FOUNDATION_EXPORT id AFJSONObjectByRemovingKeysWithNullValues(id JSONObject, NSJ
 
 /**
  Whether to automatically inflate response image data for compressed formats (such as PNG or JPEG). Enabling this can significantly improve drawing performance on iOS when used with `setCompletionBlockWithSuccess:failure:`, as it allows a bitmap representation to be constructed in the background rather than on the main thread. `YES` by default.
+ 是否对响应的图片进行自动处理
  */
 @property (nonatomic, assign) BOOL automaticallyInflatesResponseImage;
 #endif
@@ -255,6 +257,8 @@ FOUNDATION_EXPORT id AFJSONObjectByRemovingKeysWithNullValues(id JSONObject, NSJ
 
 /**
  `AFCompoundSerializer` is a subclass of `AFHTTPResponseSerializer` that delegates the response serialization to the first `AFHTTPResponseSerializer` object that returns an object for `responseObjectForResponse:data:error:`, falling back on the default behavior of `AFHTTPResponseSerializer`. This is useful for supporting multiple potential types and structures of server responses with a single serializer.
+ 
+  使用多种解析类型
  */
 @interface AFCompoundResponseSerializer : AFHTTPResponseSerializer
 

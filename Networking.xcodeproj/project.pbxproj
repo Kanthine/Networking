@@ -105,15 +105,15 @@
 			isa = PBXGroup;
 			children = (
 				1A8873A52487369600A50926 /* HttpProtocolManager.h */,
-				1A8873A62487369600A50926 /* URLSessionManager.h */,
-				1A8873A72487369600A50926 /* URLSessionManager+Block.h */,
-				1A8873A82487369600A50926 /* URLSessionManager+Delegate.h */,
-				1A8873A92487369600A50926 /* URLSessionDelegateManager.m */,
-				1A8873AA2487369600A50926 /* URLSessionManager.m */,
 				1A8873AB2487369600A50926 /* HttpProtocolManager.m */,
 				1A8873AC2487369600A50926 /* URLSessionDelegateManager.h */,
-				1A8873AD2487369600A50926 /* URLSessionManager+Delegate.m */,
+				1A8873A92487369600A50926 /* URLSessionDelegateManager.m */,
+				1A8873A62487369600A50926 /* URLSessionManager.h */,
+				1A8873AA2487369600A50926 /* URLSessionManager.m */,
+				1A8873A72487369600A50926 /* URLSessionManager+Block.h */,
 				1A8873AE2487369600A50926 /* URLSessionManager+Block.m */,
+				1A8873A82487369600A50926 /* URLSessionManager+Delegate.h */,
+				1A8873AD2487369600A50926 /* URLSessionManager+Delegate.m */,
 			);
 			path = URLSessionGroup;
 			sourceTree = "<group>";
@@ -121,14 +121,14 @@
 		1A8873B02487369600A50926 /* HttpManagerGroup */ = {
 			isa = PBXGroup;
 			children = (
-				1A8873B12487369600A50926 /* HttpManager.h */,
-				1A8873B22487369600A50926 /* RequestURL.h */,
-				1A8873B32487369600A50926 /* AFNetTools.h */,
 				1A8873B42487369600A50926 /* AFNetAPIClient.h */,
-				1A8873B52487369600A50926 /* HttpCategory */,
-				1A8873BA2487369600A50926 /* HttpManager.m */,
 				1A8873BB2487369600A50926 /* AFNetAPIClient.m */,
+				1A8873B32487369600A50926 /* AFNetTools.h */,
 				1A8873BC2487369600A50926 /* AFNetTools.m */,
+				1A8873B52487369600A50926 /* HttpCategory */,
+				1A8873B12487369600A50926 /* HttpManager.h */,
+				1A8873BA2487369600A50926 /* HttpManager.m */,
+				1A8873B22487369600A50926 /* RequestURL.h */,
 			);
 			path = HttpManagerGroup;
 			sourceTree = "<group>";
