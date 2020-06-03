@@ -28,7 +28,7 @@
 #import "AFHTTPSessionManager.h"
 
 NS_ASSUME_NONNULL_BEGIN
-
+//一堆图片下载，执行任务的顺序。
 typedef NS_ENUM(NSInteger, AFImageDownloadPrioritization) {
     AFImageDownloadPrioritizationFIFO,
     AFImageDownloadPrioritizationLIFO
@@ -36,6 +36,8 @@ typedef NS_ENUM(NSInteger, AFImageDownloadPrioritization) {
 
 /**
  The `AFImageDownloadReceipt` is an object vended by the `AFImageDownloader` when starting a data task. It can be used to cancel active tasks running on the `AFImageDownloader` session. As a general rule, image data tasks should be cancelled using the `AFImageDownloadReceipt` instead of calling `cancel` directly on the `task` itself. The `AFImageDownloader` is optimized to handle duplicate task scenarios as well as pending versus active downloads.
+ 
+  “AFImageDownloadReceipt”是在启动数据任务时由“AFImageDownloader”发送的对象。它可以用来取消在“AFImageDownloader”会话上运行的活动任务。一般来说，图像数据任务应该使用“AFImageDownloadReceipt”来取消，而不是直接在“任务”上调用“cancel”。“AFImageDownloader”经过优化，可以处理重复的任务场景，以及挂起和活动下载。
  */
 @interface AFImageDownloadReceipt : NSObject
 
@@ -46,11 +48,18 @@ typedef NS_ENUM(NSInteger, AFImageDownloadPrioritization) {
 
 /**
  The unique identifier for the success and failure blocks when duplicate requests are made.
+ 
+ 发出重复请求时，成功和失败块的唯一标识符。
+
  */
 @property (nonatomic, strong) NSUUID *receiptID;
 @end
 
 /** The `AFImageDownloader` class is responsible for downloading images in parallel on a prioritized queue. Incoming downloads are added to the front or back of the queue depending on the download prioritization. Each downloaded image is cached in the underlying `NSURLCache` as well as the in-memory image cache. By default, any download request with a cached image equivalent in the image cache will automatically be served the cached image representation.
+ 
+ AFImageDownloader类负责在优先级队列上并行下载图像。根据下载优先级的不同，传入的下载被添加到队列的前面或后面。
+ 下载的每个映像都缓存在底层的“NSURLCache”以及内存中的映像缓存中。
+ 默认情况下，在映像缓存中具有缓存映像等效项的任何下载请求将自动为缓存映像表示提供服务。
  */
 @interface AFImageDownloader : NSObject
 
@@ -66,10 +75,13 @@ typedef NS_ENUM(NSInteger, AFImageDownloadPrioritization) {
 
 /**
  Defines the order prioritization of incoming download requests being inserted into the queue. `AFImageDownloadPrioritizationFIFO` by default.
+ 
+ 下载顺序
+
  */
 @property (nonatomic, assign) AFImageDownloadPrioritization downloadPrioritization;
 
-/**
+/** //该类为单例
  The shared default instance of `AFImageDownloader` initialized with default values.
  */
 + (instancetype)defaultInstance;
@@ -161,6 +173,8 @@ typedef NS_ENUM(NSInteger, AFImageDownloadPrioritization) {
  If the data task is pending in the queue, it will be cancelled if no other success and failure blocks are registered with the data task. If the data task is currently executing or is already completed, the success and failure blocks are removed and will not be called when the task finishes.
 
  @param imageDownloadReceipt The image download receipt to cancel.
+ 取消下载任务
+
  */
 - (void)cancelTaskForImageDownloadReceipt:(AFImageDownloadReceipt *)imageDownloadReceipt;
 

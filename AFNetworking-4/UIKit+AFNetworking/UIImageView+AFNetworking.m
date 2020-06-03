@@ -75,7 +75,7 @@
                        success:(void (^)(NSURLRequest *request, NSHTTPURLResponse * _Nullable response, UIImage *image))success
                        failure:(void (^)(NSURLRequest *request, NSHTTPURLResponse * _Nullable response, NSError *error))failure
 {
-    if ([urlRequest URL] == nil) {
+    if ([urlRequest URL] == nil) {//url为空，则取消
         self.image = placeholderImage;
         if (failure) {
             NSError *error = [NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorBadURL userInfo:nil];
@@ -84,58 +84,62 @@
         return;
     }
     
+     //看看设置的当前的回调的request和需要请求的request是不是为同一个，是的话为重复调用，直接返回
     if ([self isActiveTaskURLEqualToURLRequest:urlRequest]) {
         return;
     }
     
-    [self cancelImageDownloadTask];
+    [self cancelImageDownloadTask];//开始请求前，先取消之前的task,即解绑回调
 
-    AFImageDownloader *downloader = [[self class] sharedImageDownloader];
-    id <AFImageRequestCache> imageCache = downloader.imageCache;
+    AFImageDownloader *downloader = [[self class] sharedImageDownloader];//拿到downloader
+    id <AFImageRequestCache> imageCache = downloader.imageCache;//拿到cache
 
     //Use the image from the image cache if it exists
     UIImage *cachedImage = [imageCache imageforRequest:urlRequest withAdditionalIdentifier:nil];
-    if (cachedImage) {
-        if (success) {
+    if (cachedImage) { //去获取cachedImage
+        if (success) {//有的话直接设置，并且置空回调
             success(urlRequest, nil, cachedImage);
         } else {
             self.image = cachedImage;
         }
         [self clearActiveDownloadInformation];
     } else {
-        if (placeholderImage) {
+        if (placeholderImage) { //无缓存，如果有占位图，先设置
             self.image = placeholderImage;
         }
 
         __weak __typeof(self)weakSelf = self;
         NSUUID *downloadID = [NSUUID UUID];
-        AFImageDownloadReceipt *receipt;
+        AFImageDownloadReceipt *receipt; //去下载，并得到一个receipt，可以用来取消回调
         receipt = [downloader
                    downloadImageForURLRequest:urlRequest
                    withReceiptID:downloadID
                    success:^(NSURLRequest * _Nonnull request, NSHTTPURLResponse * _Nullable response, UIImage * _Nonnull responseObject) {
                        __strong __typeof(weakSelf)strongSelf = weakSelf;
+            
+                        //判断receiptID和downloadID是否相同 成功回调，设置图片
                        if ([strongSelf.af_activeImageDownloadReceipt.receiptID isEqual:downloadID]) {
                            if (success) {
                                success(request, response, responseObject);
                            } else if (responseObject) {
                                strongSelf.image = responseObject;
                            }
-                           [strongSelf clearActiveDownloadInformation];
+                           [strongSelf clearActiveDownloadInformation];//置空回调
                        }
 
                    }
                    failure:^(NSURLRequest * _Nonnull request, NSHTTPURLResponse * _Nullable response, NSError * _Nonnull error) {
                        __strong __typeof(weakSelf)strongSelf = weakSelf;
+                        //失败有failuerBlock就回调，
                         if ([strongSelf.af_activeImageDownloadReceipt.receiptID isEqual:downloadID]) {
                             if (failure) {
                                 failure(request, response, error);
                             }
-                            [strongSelf clearActiveDownloadInformation];
+                            [strongSelf clearActiveDownloadInformation];//置空回调对象
                         }
                    }];
 
-        self.af_activeImageDownloadReceipt = receipt;
+        self.af_activeImageDownloadReceipt = receipt; //赋值
     }
 }
 
