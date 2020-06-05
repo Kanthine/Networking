@@ -494,6 +494,8 @@ id AFJSONObjectByRemovingKeysWithNullValues(id JSONObject, NSJSONReadingOptions 
     return serializer;
 }
 
+/** 初始化方法指定了content-type是"application/x-plist"，即只支持plist格式的报文数据
+*/
 - (instancetype)init {
     self = [super init];
     if (!self) {

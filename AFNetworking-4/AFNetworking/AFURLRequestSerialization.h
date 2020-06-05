@@ -28,90 +28,56 @@
 #import <WatchKit/WatchKit.h>
 #endif
 
-/*
- 为什么需要Url编码? 因为Url中有些字符会引起歧义
- Url的编码格式采用的是ASCII码，而不是Unicode，这也就是说你不能在Url中包含任何非ASCII字符，例如中文
- Url编码的原则就是使用安全的字符（没有特殊用途或者特殊意义的可打印字符）去表示那些不安全的字符。
- 
- 哪些字符需要编码?
- RFC3986文档规定，Url中只允许包含英文字母（a-zA-Z）、数字（0-9）、-_.~4个特殊字符以及所有保留字符。
-*/
-
 NS_ASSUME_NONNULL_BEGIN
 
-/**
- Returns a percent-escaped string following RFC 3986 for a query string key or value.
- RFC 3986 states that the following characters are "reserved" characters.
- - General Delimiters: ":", "#", "[", "]", "@", "?", "/"
- - Sub-Delimiters: "!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "="
-
- 根据RFC 3986的规定：URL百分比编码的保留字段分为：
- 
- 1.   ':'  '#'  '['  ']'  '@'  '?'  '/'
- 
- 2.   '!'  '$'  '&'  '''  '('  ')'  '*'  '+'  ','  ';' '='
- 
- 在对请求参数百分比编码时，'?'和'/'可以不用编码，其他的都要进行编码。
-
- 
- In RFC 3986 - Section 3.4, it states that the "?" and "/" characters should not be escaped to allow
- query strings to include a URL. Therefore, all "reserved" characters with the exception of "?" and "/"
- should be percent-escaped in the query string.
- 
- @param string The string to be percent-escaped.
- 
- @return The percent-escaped string.
+/** 根据 RFC3986 规范进行编码后的字符串
+ *
+ * @Abstract 由于 URL 的字符串中某些字符可能引起歧义，需要对 URL 编码：
+ *          URL 编码格式采用 ASCII 码，而不是 Unicode，这也就是说不能在 URL 中包含任何非ASCII字符，如中文 ；
+ *          URL 编码原则就是使用安全的字符（没有特殊用途或者特殊意义的可打印字符）去表示那些不安全的字符。
+ *
+ * @need 哪些字符需要编码? RFC3986文档规定，URL 中只允许包含英文字母（a-zA-Z）、数字（0-9）、-_.~ 4个特殊字符以及下述保留字符：
+ *  <ul>
+ *     <li> 普通的分隔符 ":", "#", "[", "]", "@", "?", "/"
+ *     <li> 子分隔符: "!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "="
+ *  </ul>
+ *
+ * @param string 待编码请求参数，'?'和'/'可以不用编码，其他的都要进行编码。
  */
 FOUNDATION_EXPORT NSString * AFPercentEscapedStringFromString(NSString *string);
 
-/**
- A helper method to generate encoded url query parameters for appending to the end of a URL.
-
- @param parameters A dictionary of key/values to be encoded.
-
- @return A url encoded query string
- 
- 返回百分比编码后的请求参数
-
+/** 将 parameters 中的参数附加到 URL 末尾并编码
+ * @case 如 @{@"name":@"zhangsan",@"age":20} 附加为 name=zhangsan&age=20
  */
 FOUNDATION_EXPORT NSString * AFQueryStringFromParameters(NSDictionary *parameters);
 
-/**
- The `AFURLRequestSerialization` protocol is adopted by an object that encodes parameters for a specified HTTP requests. Request serializers may encode parameters as query strings, HTTP bodies, setting the appropriate HTTP header fields as necessary.
 
- For example, a JSON request serializer may set the HTTP body of the request to a JSON representation, and set the `Content-Type` HTTP header field value to `application/json`.
+
+/** AFURLRequestSerialization 协议用来为指定的 HTTP 请求编码参数。请求序列化器将参数编码为查询字符串、HTTP正文，并根据需要设置 HTTP header fields ！
+ * 例如，JSON 请求序列化器可以将请求的 HTTP body设置为JSON表示，并将HTTP头字段 Content-Type 值设置为 application/ JSON
  */
 @protocol AFURLRequestSerialization <NSObject, NSSecureCoding, NSCopying>
 
-/**
- Returns a request with the specified parameters encoded into a copy of the original request.
-
- @param request The original request.
- @param parameters The parameters to be encoded.
- @param error The error that occurred while attempting to encode the request parameters.
- 提供了一个序列化parameters参数的方法
-
- @return A serialized request.
+/** 将参数 parameters 编码到 NSURLRequest ，并返回副本
+ * @param request 最初的 request 请求
+ * @param parameters 待编码的参数
+ * @param error 编码时遇到的错误
  */
 - (nullable NSURLRequest *)requestBySerializingRequest:(NSURLRequest *)request
                                withParameters:(nullable id)parameters
                                         error:(NSError * _Nullable __autoreleasing *)error NS_SWIFT_NOTHROW;
 
-/*
-NS_SWIFT_NOTHROW 在swift中没有错误抛出
-NS_SWIFT_UNAVAILABLE 在swift中无效
-NS_NOESCAPE swift中有逃逸概念，默认闭包是noescap
+/** NS_SWIFT_NOTHROW 在swift中没有错误抛出
+ * NS_SWIFT_UNAVAILABLE 在swift中无效
+ * NS_NOESCAPE swift中有逃逸概念，默认闭包是noescap
 */
 
 @end
 
 #pragma mark -
 
-/**
 
- */
 ///枚举：请求参数序列化类型
-
 typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
     AFHTTPRequestQueryStringDefaultStyle = 0,
 };
@@ -144,7 +110,7 @@ typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
  */
 @property (nonatomic, assign) BOOL allowsCellularAccess;
 
-/* *NSURLRequestCachePolicy
+/**NSURLRequestCachePolicy
 
 NSURLRequestUseProtocolCachePolicy （基础策略）
 
