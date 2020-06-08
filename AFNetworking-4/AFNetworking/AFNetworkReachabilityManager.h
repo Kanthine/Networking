@@ -1,5 +1,3 @@
-
-
 #import <Foundation/Foundation.h>
 
 #if !TARGET_OS_WATCH
@@ -13,28 +11,21 @@ typedef NS_ENUM(NSInteger, AFNetworkReachabilityStatus) {
     AFNetworkReachabilityStatusReachableViaWiFi = 2,//WiFi网络
 };
 
-NS_ASSUME_NONNULL_BEGIN
-/*
+/**
 如果需要每个属性或每个方法都去指定nonnull和nullable，是一件非常繁琐的事，苹果为了减轻我们的工作量，专门提供了两个宏：
 NS_ASSUME_NONNULL_BEGIN 与 NS_ASSUME_NONNULL_END
 在这两个宏之间的代码，所有简单指针对象都被假定为nonnull，因此我们只需要去指定那些nullable的指针
-__nullable指代对象可以为NULL或者为NIL
-__nonnull指代对象不能为null
+__nullable 指代对象可以为NULL或者为NIL
+__nonnull 指代对象不能为null
 */
 
+NS_ASSUME_NONNULL_BEGIN
 
-/**
- `AFNetworkReachabilityManager` monitors the reachability of domains, and addresses for both WWAN and WiFi network interfaces.
-
- Reachability can be used to determine background information about why a network operation failed, or to trigger a network operation retrying when a connection is established. It should not be used to prevent a user from initiating a network request, as it's possible that an initial request may be required to establish reachability.
-
- See Apple's Reachability Sample Code ( https://developer.apple.com/library/ios/samplecode/reachability/ )
-
- @warning Instances of `AFNetworkReachabilityManager` must be started with `-startMonitoring` before reachability status can be determined.
+/** AFNetworkReachabilityManager 用于监测网络环境变化：WWAN 和 WiFi 以及网指定服务器
+ * @warning 调用 -startMonitoring 方法确定网络状态
+ *
+ * 参考苹果官方 Reachability 的源码(https://developer.apple.com/library/ios/samplecode/reachability/ )
  */
-/*
-* 用来监控网络环境变化的类。
-*/
 @interface AFNetworkReachabilityManager : NSObject
 
 /** 当前的网络状态 */
@@ -53,160 +44,98 @@ __nonnull指代对象不能为null
 /// @name Initialization
 ///---------------------
 
-/**
- Returns the shared network reachability manager.
+/** 获取监测器单例
  */
 + (instancetype)sharedManager;
 
-/** 获取单例 */
+/** 获取监测器 */
 + (instancetype)manager;
 
-/**
- Creates and returns a network reachability manager for the specified domain.
-
- @param domain The domain used to evaluate network reachability.
-
- @return An initialized network reachability manager, actively monitoring the specified domain.
- 
- 监听制定domain的网络状态。
-
+/** 创建指定服务器域名的监测器
+ * @param domain 待评估网络状态的服务器域名
  */
 + (instancetype)managerForDomain:(NSString *)domain;
 
-/**
- Creates and returns a network reachability manager for the socket address.
-
- @param address The socket address (`sockaddr_in6`) used to evaluate network reachability.
-
- @return An initialized network reachability manager, actively monitoring the specified socket address.
- 
- 监听某个socket地址的网络状态
-
+/** 监听某个socket的网络状态
  */
 + (instancetype)managerForAddress:(const void *)address;
 
-/**
- Initializes an instance of a network reachability manager from the specified reachability object.
-
- @param reachability The reachability object to monitor.
-
- @return An initialized network reachability manager, actively monitoring the specified reachability.
- 
- SCNetworkReachabilityRef 这个很重要，这个类的就是基于它开发的。
-
+/** 主动监控指定的SCNetworkReachabilityRef
+ * @param reachability 要监视的 SCNetworkReachabilityRef
+ * @note SCNetworkReachabilityRef 这个很重要，这个类的就是基于它开发的。
  */
 - (instancetype)initWithReachability:(SCNetworkReachabilityRef)reachability NS_DESIGNATED_INITIALIZER;
 
-/**
- *  Unavailable initializer
+/**  禁用该初始化方法
  */
 + (instancetype)new NS_UNAVAILABLE;
-
-/**
- *  Unavailable initializer
- */
 - (instancetype)init NS_UNAVAILABLE;
 
 ///--------------------------------------------------
-/// @name Starting & Stopping Reachability Monitoring
+/// @name 启动和停止监听
 ///--------------------------------------------------
 
 
 /** 开始监听 */
 - (void)startMonitoring;
 
-/** 结束监听 */
+/** 停止监听 */
 - (void)stopMonitoring;
 
 ///-------------------------------------------------
-/// @name Getting Localized Reachability Description
+/// @name 获取本地化的 Reachability 描述
 ///-------------------------------------------------
 
-/**
- Returns a localized string representation of the current network reachability status.
+/** 获取当前网络状态的本地化字符串表示
+ * 往往我们可以根据这个字符串来告诉用户，当前网络发生了什么，当然，也可以根据状态自定义提示文字。
  */
-/**
-Returns a localized string representation of the current network reachability status.
-返回一个网络状态的本地语言的字符串。
-往往我们可以根据这个字符串来告诉用户，当前网络发生了什么，当然，也可以根据状态自定义提示文字。
-*/
 - (NSString *)localizedNetworkReachabilityStatusString;
 
 ///---------------------------------------------------
-/// @name Setting Network Reachability Change Callback
+/// @name 网络状态变化的回调
 ///---------------------------------------------------
 
-/**
- Sets a callback to be executed when the network availability of the `baseURL` host changes.
-
- @param block A block object to be executed when the network availability of the `baseURL` host changes.. This block has no return value and takes a single argument which represents the various reachability states from the device to the `baseURL`.
- 
- 置网络转态改变的回调
- 
- 监听网络改变的回调有两种方式：
- 1.使用上边的这个方法。
- 2.监听AFNetworkingReachabilityDidChangeNotification通知。
+/** 当主机 baseURL 网络状态变化时执行的回调
+ * @note 也可以使用通知 AFNetworkingReachabilityDidChangeNotification 监听网络变化
  */
 - (void)setReachabilityStatusChangeBlock:(nullable void (^)(AFNetworkReachabilityStatus status))block;
 
 @end
 
 ///----------------
-/// @name Constants
+/// @name 常量
 ///----------------
 
-/**
- ## Network Reachability
-
- The following constants are provided by `AFNetworkReachabilityManager` as possible network reachability statuses.
-
- enum {
- AFNetworkReachabilityStatusUnknown,
- AFNetworkReachabilityStatusNotReachable,
- AFNetworkReachabilityStatusReachableViaWWAN,
- AFNetworkReachabilityStatusReachableViaWiFi,
- }
-
- `AFNetworkReachabilityStatusUnknown`
- The `baseURL` host reachability is not known.
-
- `AFNetworkReachabilityStatusNotReachable`
- The `baseURL` host cannot be reached.
-
- `AFNetworkReachabilityStatusReachableViaWWAN`
- The `baseURL` host can be reached via a cellular connection, such as EDGE or GPRS.
-
- `AFNetworkReachabilityStatusReachableViaWiFi`
- The `baseURL` host can be reached via a Wi-Fi connection.
-
- ### Keys for Notification UserInfo Dictionary
-
- Strings that are used as keys in a `userInfo` dictionary in a network reachability status change notification.
-
- `AFNetworkingReachabilityNotificationStatusItem`
- A key in the userInfo dictionary in a `AFNetworkingReachabilityDidChangeNotification` notification.
- The corresponding value is an `NSNumber` object representing the `AFNetworkReachabilityStatus` value for the current reachability status.
+/** AFNetworkReachabilityManager 提供的主机 baseURL 网络状态
+ *  <ul>
+ *     <li> AFNetworkReachabilityStatusUnknown  网络状态未知
+ *     <li> AFNetworkReachabilityStatusNotReachable  网络不可链接
+ *     <li> AFNetworkReachabilityStatusReachableViaWWAN  是蜂窝网络，如EDGE或GPRS
+ *     <li> AFNetworkReachabilityStatusReachableViaWiFi 是 Wi-Fi 网络
+ *  </ul>
+ *
+ *
+ * 通知中字典 UserInfo 中的键：
+ *  <ul>
+ *     <li> AFNetworkingReachabilityNotificationStatusItem 对应 NSNumber 对象，表示当前网络状态
+ *  </ul>
  */
 
 ///--------------------
-/// @name Notifications
+/// @name 通知
 ///--------------------
 
-/**
- Posted when network reachability changes.
- This notification assigns no notification object. The `userInfo` dictionary contains an `NSNumber` object under the `AFNetworkingReachabilityNotificationStatusItem` key, representing the `AFNetworkReachabilityStatus` value for the current network reachability.
-
- @warning In order for network reachability to be monitored, include the `SystemConfiguration` framework in the active target's "Link Binary With Library" build phase, and add `#import <SystemConfiguration/SystemConfiguration.h>` to the header prefix of the project (`Prefix.pch`).
+/** 当网络状态改变时发送的通知
+ *  @warning 为了监测网络状态，将 <SystemConfiguration> 框架添加到 target's 的Link Binary With Library 。 ，并 #import <SystemConfiguration/SystemConfiguration.h> 到项目的头前缀 Prefix.pch
  */
 FOUNDATION_EXPORT NSString * const AFNetworkingReachabilityDidChangeNotification;
 FOUNDATION_EXPORT NSString * const AFNetworkingReachabilityNotificationStatusItem;
 
 ///--------------------
-/// @name Functions
+/// @name 功能
 ///--------------------
 
-/**
- Returns a localized string representation of an `AFNetworkReachabilityStatus` value.
+/** 获取 AFNetworkReachabilityStatus 值的本地化字符串表示
  */
 FOUNDATION_EXPORT NSString * AFStringFromNetworkReachabilityStatus(AFNetworkReachabilityStatus status);
 

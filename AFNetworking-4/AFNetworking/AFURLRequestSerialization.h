@@ -230,17 +230,12 @@ typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
                               constructingBodyWithBlock:(nullable void (^)(id <AFMultipartFormData> formData))block
                                                   error:(NSError * _Nullable __autoreleasing *)error;
 
-/**
- Creates an `NSMutableURLRequest` by removing the `HTTPBodyStream` from a request, and asynchronously writing its contents into the specified file, invoking the completion handler when finished.
-
- @param request The multipart form request. The `HTTPBodyStream` property of `request` must not be `nil`.
- @param fileURL The file URL to write multipart form contents to.
- @param handler A handler block to execute.
-
- @discussion There is a bug in `NSURLSessionTask` that causes requests to not send a `Content-Length` header when streaming contents from an HTTP body, which is notably problematic when interacting with the Amazon S3 webservice. As a workaround, this method takes a request constructed with `multipartFormRequestWithMethod:URLString:parameters:constructingBodyWithBlock:error:`, or any other request with an `HTTPBodyStream`, writes the contents to the specified file and returns a copy of the original request with the `HTTPBodyStream` property set to `nil`. From here, the file can either be passed to `AFURLSessionManager -uploadTaskWithRequest:fromFile:progress:completionHandler:`, or have its contents read into an `NSData` that's assigned to the `HTTPBody` property of the request.
-
- @see https://github.com/AFNetworking/AFNetworking/issues/1398
- */
+/** 创建一个移除  HTTPBodyStream 的NSMutableURLRequest ，并将 HTTPBodyStream 内容异步写入指定文件，完成时调用 handler
+ * @param request AFMultipartFormData 请求. HTTPBodyStream 不能为 nil
+ * @param fileURL 要写入 AFMultipartFormData的 URL
+ * @discussion 在 NSURLSessionTask 中有一个bug，当 HTTP body 有 streaming 数据时请求不能发送 Content-Length 头信息，这在与Amazon S3 webservice交互时是一个明显的问题。解决方法,该方法以一个请求由 -multipartFormRequestWithMethod:URLString:parameters:constructingBodyWithBlock:error: ,或任何其他请求 HTTPBodyStream ,将内容写入指定的文件和返回一个 HTTPBodyStream 设置为 nil 的原始请求的副本 。 从这里，文件可以被传递到AFURLSessionManager 的 -uploadTaskWithRequest:fromFile:progress:completionHandler: 方法，或者把它的内容读入一个 被分配给请求 HTTPBody 的 NSData中！
+ * @see https://github.com/AFNetworking/AFNetworking/issues/1398
+*/
 - (NSMutableURLRequest *)requestWithMultipartFormRequest:(NSURLRequest *)request
                              writingStreamContentsToFile:(NSURL *)fileURL
                                        completionHandler:(nullable void (^)(NSError * _Nullable error))handler;
@@ -249,26 +244,19 @@ typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
 
 #pragma mark -
 
-/**
- The `AFMultipartFormData` protocol defines the methods supported by the parameter in the block argument of `AFHTTPRequestSerializer -multipartFormRequestWithMethod:URLString:parameters:constructingBodyWithBlock:`.
- 
- 主要用于添加 multipart/form-data 请求的Content-Disposition: file; filename = #{generated filename}; name=#{name}" 和 Content-Type: #{generated mimeType}的请求体域。
-
- 
- */
+/** AFMultipartFormData 协议中的方法是为 AFHTTPRequestSerializer 的 -multipartFormRequestWithMethod:URLString:parameters:constructingBodyWithBlock 方法中 Block 的参数提供的。
+ * AFMultipartFormData 主要用于添加 multipart/form-data 请求的 Content-Disposition: file; filename = #{generated filename}; name=#{name}" 和 Content-Type: #{generated mimeType} 的请求体域。
+*/
 @protocol AFMultipartFormData
 
-/**
- Appends the HTTP header `Content-Disposition: file; filename=#{generated filename}; name=#{name}"` and `Content-Type: #{generated mimeType}`, followed by the encoded file data and the multipart form boundary.
-
- The filename and MIME type for this data in the form will be automatically generated, using the last path component of the `fileURL` and system associated MIME type for the `fileURL` extension, respectively.
-
- @param fileURL The URL corresponding to the file whose content will be appended to the form. This parameter must not be `nil`.
- @param name The name to be associated with the specified data. This parameter must not be `nil`.
- @param error If an error occurs, upon return contains an `NSError` object that describes the problem.
-
- @return `YES` if the file data was successfully appended, otherwise `NO`.
- */
+/** 追加HTTP头的 Content-Disposition: file;文件名= #{生成文件名};name=#{name} 和 Content-Type: #{generated mimeType}，其次是编码的文件数据和多部分表单边界。
+ *
+ * 分别使用 fileURL 中最后的路径部分和文件 URL 扩展的系统关联 MIME 类型，在表单中数据的文件名和 MIME 类型将自动生成。
+ *
+ * @param fileURL 将内容附加到表单的文件相对应的URL，不能为 nil
+ * @param name 与指定数据关联的名称。不能为nil。
+ * @return 追加文件数据成功返回 YES
+*/
 - (BOOL)appendPartWithFileURL:(NSURL *)fileURL
                          name:(NSString *)name
                         error:(NSError * _Nullable __autoreleasing *)error;
@@ -280,9 +268,6 @@ typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
  @param name The name to be associated with the specified data. This parameter must not be `nil`.
  @param fileName The file name to be used in the `Content-Disposition` header. This parameter must not be `nil`.
  @param mimeType The declared MIME type of the file data. This parameter must not be `nil`.
- @param error If an error occurs, upon return contains an `NSError` object that describes the problem.
-
- @return `YES` if the file data was successfully appended otherwise `NO`.
  */
 - (BOOL)appendPartWithFileURL:(NSURL *)fileURL
                          name:(NSString *)name
@@ -325,8 +310,7 @@ typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
  @param name The name to be associated with the specified data. This parameter must not be `nil`.
  */
 
-- (void)appendPartWithFormData:(NSData *)data
-                          name:(NSString *)name;
+- (void)appendPartWithFormData:(NSData *)data name:(NSString *)name;
 
 
 /**
@@ -354,21 +338,19 @@ typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
 #pragma mark -
 
 /**
- `AFJSONRequestSerializer` is a subclass of `AFHTTPRequestSerializer` that encodes parameters as JSON using `NSJSONSerialization`, setting the `Content-Type` of the encoded request to `application/json`.
- 
- 针对JSON类型的序列化优化。
- */
+ AFJSONRequestSerializer 针对JSON类型的优化：使用 NSJSONSerialization 将参数编码为JSON数据，将已编码请求的 Content-Type 设置为 application/ JSON
+*/
 @interface AFJSONRequestSerializer : AFHTTPRequestSerializer
 
-/**
- Options for writing the request JSON data from Foundation objects. For possible values, see the `NSJSONSerialization` documentation section "NSJSONWritingOptions". `0` by default.
- */
+/** 用于编写 JSON 数据的枚举值，默认 0
+ * <ul>
+ *     <li> NSJSONWritingPrettyPrinted 使用空格和缩进使输出更具可读性的；如果没有设置此选项，将生成尽可能紧凑的JSON数据。
+ *     <li> NSJSONWritingSortedKeys 按字典顺序对键进行排序的
+ *  </ul>
+*/
 @property (nonatomic, assign) NSJSONWritingOptions writingOptions;
 
-/**
- Creates and returns a JSON serializer with specified reading and writing options.
-
- @param writingOptions The specified JSON writing options.
+/** 创建具有指定读写选项的JSON序列化器
  */
 + (instancetype)serializerWithWritingOptions:(NSJSONWritingOptions)writingOptions;
 
@@ -376,30 +358,28 @@ typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
 
 #pragma mark -
 
-/**
- `AFPropertyListRequestSerializer` is a subclass of `AFHTTPRequestSerializer` that encodes parameters as JSON using `NSPropertyListSerializer`, setting the `Content-Type` of the encoded request to `application/x-plist`.
- 
- 针对Plist类型的序列化优化。
+
+/** AFPropertyListRequestSerializer 针对Plist类型的优化：使用 NSPropertyListSerializer 将参数编码为JSON，将已编码请求的 Content-Type 设置为 application/x-plist 。
  */
 @interface AFPropertyListRequestSerializer : AFHTTPRequestSerializer
 
-/**
- The property list format. Possible values are described in "NSPropertyListFormat".
+/** 指定属性列表序列化格式
+ * <ul>
+ *     <li> NSPropertyListOpenStepFormat 指定从 OpenStep APIs 继承的ASCII属性列表格式
+ *     <li> NSPropertyListXMLFormat_v1_0 指定XML属性列表格式
+ *     <li> NSPropertyListBinaryFormat_v1_0 指定二进制属性列表格式
+ *  </ul>
  */
 @property (nonatomic, assign) NSPropertyListFormat format;
 
-/**
- @warning The `writeOptions` property is currently unused.
+/** 写选项
+ * @warning writeOptions 属性目前未使用
  */
 @property (nonatomic, assign) NSPropertyListWriteOptions writeOptions;
 
-/**
- Creates and returns a property list serializer with a specified format, read options, and write options.
-
- @param format The property list format.
- @param writeOptions The property list write options.
-
- @warning The `writeOptions` property is currently unused.
+/** 创建具有指定格式、读选项和写选项的序列化器
+ * @param format 指定属性列表序列化格式
+ * @param writeOptions 写选项,目前未使用
  */
 + (instancetype)serializerWithFormat:(NSPropertyListFormat)format
                         writeOptions:(NSPropertyListWriteOptions)writeOptions;
@@ -409,49 +389,23 @@ typedef NS_ENUM(NSUInteger, AFHTTPRequestQueryStringSerializationStyle) {
 #pragma mark -
 
 ///----------------
-/// @name Constants
+/// @name 常量
 ///----------------
 
-/**
- ## Error Domains
-
- The following error domain is predefined.
-
- - `NSString * const AFURLRequestSerializationErrorDomain`
-
- ### Constants
-
- `AFURLRequestSerializationErrorDomain`
- AFURLRequestSerializer errors. Error codes for `AFURLRequestSerializationErrorDomain` correspond to codes in `NSURLErrorDomain`.
+/** 预定义的错误域
+ * 该错误域指定为 AFURLRequestSerializer 遇到的错误，错误码对应于 NSURLErrorDomain 中的错误码。
  */
 FOUNDATION_EXPORT NSString * const AFURLRequestSerializationErrorDomain;
 
-/**
- ## User info dictionary keys
-
- These keys may exist in the user info dictionary, in addition to those defined for NSError.
-
- - `NSString * const AFNetworkingOperationFailingURLRequestErrorKey`
-
- ### Constants
-
- `AFNetworkingOperationFailingURLRequestErrorKey`
- The corresponding value is an `NSURLRequest` containing the request of the operation associated with an error. This key is only present in the `AFURLRequestSerializationErrorDomain`.
+/** 上述指定错误域 NSError.userInfo 中指定的 key 键：
+ * 对应的值是 NSURLRequest ，包含与错误相关的 NSURLRequest。
  */
 FOUNDATION_EXPORT NSString * const AFNetworkingOperationFailingURLRequestErrorKey;
 
-/**
- ## Throttling Bandwidth for HTTP Request Input Streams
-
- @see -throttleBandwidthWithPacketSize:delay:
-
- ### Constants
-
- `kAFUploadStream3GSuggestedPacketSize`
- Maximum packet size, in number of bytes. Equal to 16kb.
-
- `kAFUploadStream3GSuggestedDelay`
- Duration of delay each time a packet is read. Equal to 0.2 seconds.
+/** 限制 HTTP 请求输入流的带宽
+ * kAFUploadStream3GSuggestedPacketSize 最大数据包字节数， 16 kb ；
+ * kAFUploadStream3GSuggestedDelay 每次读取数据包的延迟时间 0.2 秒
+ * @see -throttleBandwidthWithPacketSize:delay:
  */
 FOUNDATION_EXPORT NSUInteger const kAFUploadStream3GSuggestedPacketSize;
 FOUNDATION_EXPORT NSTimeInterval const kAFUploadStream3GSuggestedDelay;
