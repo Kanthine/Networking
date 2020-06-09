@@ -29,7 +29,6 @@ static dispatch_queue_t url_session_manager_processing_queue() {
     dispatch_once(&onceToken, ^{
         af_url_session_manager_processing_queue = dispatch_queue_create("com.alamofire.networking.session.manager.processing", DISPATCH_QUEUE_CONCURRENT);
     });
-
     return af_url_session_manager_processing_queue;
 }
 
@@ -44,20 +43,19 @@ static dispatch_group_t url_session_manager_completion_group() {
     return af_url_session_manager_completion_group;
 }
 
-//Resume 重新开始
+/********************  通知  *********************/
+
+//任务开始的通知
 NSString * const AFNetworkingTaskDidResumeNotification = @"com.alamofire.networking.task.resume";
-
-//Complete 完成
+//任务完成的通知
 NSString * const AFNetworkingTaskDidCompleteNotification = @"com.alamofire.networking.task.complete";
-
-//Suspend 暂停
+//任务暂停的通知
 NSString * const AFNetworkingTaskDidSuspendNotification = @"com.alamofire.networking.task.suspend";
-
-// Invalidate 使无效
+//使任务失效的通知
 NSString * const AFURLSessionDidInvalidateNotification = @"com.alamofire.networking.session.invalidate";
-
-//移动文件失败
+//下载文件移动成功的通知
 NSString * const AFURLSessionDownloadTaskDidMoveFileSuccessfullyNotification = @"com.alamofire.networking.session.download.file-manager-succeed";
+//下载文件移动失败的通知
 NSString * const AFURLSessionDownloadTaskDidFailToMoveFileNotification = @"com.alamofire.networking.session.download.file-manager-error";
 
 NSString * const AFNetworkingTaskDidCompleteSerializedResponseKey = @"com.alamofire.networking.task.complete.serializedresponse";
@@ -124,14 +122,12 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
     if (!self) {
         return nil;
     }
-    
     _mutableData = [NSMutableData data];
     _uploadProgress = [[NSProgress alloc] initWithParent:nil userInfo:nil];
     _downloadProgress = [[NSProgress alloc] initWithParent:nil userInfo:nil];
     
     __weak __typeof__(task) weakTask = task;
-    for (NSProgress *progress in @[ _uploadProgress, _downloadProgress ])
-    {
+    for (NSProgress *progress in @[ _uploadProgress, _downloadProgress ]){
         progress.totalUnitCount = NSURLSessionTransferSizeUnknown;
         progress.cancellable = YES;
         progress.cancellationHandler = ^{
@@ -152,10 +148,8 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
             };
         }
         
-        [progress addObserver:self
-                   forKeyPath:NSStringFromSelector(@selector(fractionCompleted))
-                      options:NSKeyValueObservingOptionNew
-                      context:NULL];
+        [progress addObserver:self forKeyPath:NSStringFromSelector(@selector(fractionCompleted))
+                      options:NSKeyValueObservingOptionNew context:NULL];
     }
     return self;
 }
@@ -383,46 +377,40 @@ static inline BOOL af_addMethod(Class theClass, SEL selector, Method method) {
 static NSString * const AFNSURLSessionTaskDidResumeNotification  = @"com.alamofire.networking.nsurlsessiontask.resume";
 static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofire.networking.nsurlsessiontask.suspend";
 
-///这个类大概的作用就是替换掉NSUrlSession中的resume和suspend方法
+/** 类 _AFURLSessionTaskSwizzling 主要用于替换 NSURLSession 的 -resume 和 -suspend 方法
+ */
 @interface _AFURLSessionTaskSwizzling : NSObject
-
 @end
-
 @implementation _AFURLSessionTaskSwizzling
 
+/** iOS7 和 iOS8 在 NSURLSessionTask 的实现略有不同，这使得下面的代码有点复杂；构建可能多地单元测试以尽验证这种行为：
+ * 以下是我们所知道的:
+ *  <li> NSURLSessionTasks 是通过类簇实现的，这意味着从API请求的类实际上不是将返回的类；
+ *  <li> 简单引用 [NSURLSessionTask class] 无用；需要通过 NSURLSession 来创建 NSURLSessionTask 对象，并从那里获取类；
+ *  <li> 在 iOS7 上，localDataTask 是 __NSCFLocalDataTask ，它继承自 __NSCFLocalSessionTask，它继承自 __NSCFURLSessionTask；
+ *  <li> 在 iOS8 上，localDataTask是 __NSCFLocalDataTask，它继承自 __NSCFLocalSessionTask，继承自 NSURLSessionTask；
+ *  <li> 在 iOS7 上，“余下的 __NSCFLocalSessionTask 和 __NSCFURLSessionTask 是仅有的实现 -resume 和 -suspend 的类，而 __NSCFLocalSessionTask 不调用 super 。这意味着两个类都需要 swizzled。
+ *  <li> 在 iOS8 上，NSURLSessionTask 是唯一实现 -resume 和 -suspend 的类。这意味着这是唯一需要 swizzled 的类。
+ *  <li> 由于 NSURLSessionTask 没有涉及到每个版本的iOS的类层次结构，它更容易添加 swizled 方法到一个虚拟类并在那里管理它们。
+ *
+ *
+ * 一些假设:
+ *  <li> 没有实现 -resume 或 -suspend 调用 super。如果这在 iOS 的未来版本中发生变化，我们需要处理它；
+ *  <li> 没有后台任务类 override -resume 或 -suspend ；
+ *
+ * 目前的解决方案:
+ *  <1> 通过请求 dataTask 的 NSURLSession 实例来获取 __NSCFLocalDataTask 实例
+ *  <2> 获取一个指向 -af_resume 原始实现的 IMP 指针
+ *  <3> 检查当前类是否有 -resume 的实现。如果有，继续步骤4
+ *  <4> 获取当前类的 superClass
+ *  <5> 获取当前类 -resume 实现的 IMP 指针
+ *  <6> 获取指向当前 -resume 的 superClass 指针
+ *  <7> 如果当前类实现的 -resume 不等于 父类实现的 -resume ，并且 -resume 的当前实现不等于 -af_resume 的原始实现，则对方法 swizzle
+ *  <8> 将当前类设置为 superClass类，并重复步骤 3-8；
+*/
 + (void)load {
-    /**
-     WARNING: Trouble Ahead
-     https://github.com/AFNetworking/AFNetworking/pull/2702
-     */
-
     if (NSClassFromString(@"NSURLSessionTask")) {
-        /**
-         iOS 7 and iOS 8 differ in NSURLSessionTask implementation, which makes the next bit of code a bit tricky.
-         Many Unit Tests have been built to validate as much of this behavior has possible.
-         Here is what we know:
-            - NSURLSessionTasks are implemented with class clusters, meaning the class you request from the API isn't actually the type of class you will get back.
-            - Simply referencing `[NSURLSessionTask class]` will not work. You need to ask an `NSURLSession` to actually create an object, and grab the class from there.
-            - On iOS 7, `localDataTask` is a `__NSCFLocalDataTask`, which inherits from `__NSCFLocalSessionTask`, which inherits from `__NSCFURLSessionTask`.
-            - On iOS 8, `localDataTask` is a `__NSCFLocalDataTask`, which inherits from `__NSCFLocalSessionTask`, which inherits from `NSURLSessionTask`.
-            - On iOS 7, `__NSCFLocalSessionTask` and `__NSCFURLSessionTask` are the only two classes that have their own implementations of `resume` and `suspend`, and `__NSCFLocalSessionTask` DOES NOT CALL SUPER. This means both classes need to be swizzled.
-            - On iOS 8, `NSURLSessionTask` is the only class that implements `resume` and `suspend`. This means this is the only class that needs to be swizzled.
-            - Because `NSURLSessionTask` is not involved in the class hierarchy for every version of iOS, its easier to add the swizzled methods to a dummy class and manage them there.
-        
-         Some Assumptions:
-            - No implementations of `resume` or `suspend` call super. If this were to change in a future version of iOS, we'd need to handle it.
-            - No background task classes override `resume` or `suspend`
-         
-         The current solution:
-            1) Grab an instance of `__NSCFLocalDataTask` by asking an instance of `NSURLSession` for a data task.
-            2) Grab a pointer to the original implementation of `af_resume`
-            3) Check to see if the current class has an implementation of resume. If so, continue to step 4.
-            4) Grab the super class of the current class.
-            5) Grab a pointer for the current class to the current implementation of `resume`.
-            6) Grab a pointer for the super class to the current implementation of `resume`.
-            7) If the current class implementation of `resume` is not equal to the super class implementation of `resume` AND the current implementation of `resume` is not equal to the original implementation of `af_resume`, THEN swizzle the methods
-            8) Set the current class to the super class, and repeat steps 3-8
-         */
+
         NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
         NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
 #pragma GCC diagnostic push

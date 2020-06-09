@@ -89,7 +89,9 @@ NS_ASSUME_NONNULL_BEGIN
                                failure:(nullable void (^)(NSURLSessionDataTask * _Nullable task, NSError *error))failure;
 
 /** 创建 HEAD 请求并运行 NSURLSessionDataTask
- */
+ * @note HEAD 请求 : 向服务器索要与GET请求相一致的响应，只不过响应体将不会被返回；在不需要传输整个响应内容的情况下，仅获取包含在响应消息头中的元信息。
+ *                  该方法常用于测试超链接的有效性，是否可以访问，以及最近是否更新。
+*/
 - (nullable NSURLSessionDataTask *)HEAD:(NSString *)URLString
                              parameters:(nullable id)parameters
                                 headers:(nullable NSDictionary <NSString *, NSString *> *)headers
@@ -98,6 +100,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 /** 创建 POST 请求并运行 NSURLSessionDataTask
  * @param uploadProgress 上传进度监控。注意，此块是在会话队列上调用的，而不是在主队列上。
+ * @note POST 请求 : 向指定资源提交数据，例如提交表单或者上传文件；数据被包含在请求体中；
+ *       POST请求可能会导致新的资源的建立和/或已有资源的修改。
  */
 - (nullable NSURLSessionDataTask *)POST:(NSString *)URLString
                              parameters:(nullable id)parameters
@@ -106,7 +110,7 @@ NS_ASSUME_NONNULL_BEGIN
                                 success:(nullable void (^)(NSURLSessionDataTask *task, id _Nullable responseObject))success
                                 failure:(nullable void (^)(NSURLSessionDataTask * _Nullable task, NSError *error))failure;
 
-/** 创建 NSMutableURLRequest 的 POST 请求并运行 NSURLSessionDataTask
+/** 创建 NSMutableURLRequest 的 POST 请求并运行 NSURLSessionUploadTask
  * @param block 接受单个 block 参数并将数据附加到 HTTP 主体；block参数遵守 AFMultipartFormData 协议
  */
 - (nullable NSURLSessionDataTask *)POST:(NSString *)URLString
@@ -118,6 +122,7 @@ NS_ASSUME_NONNULL_BEGIN
                                 failure:(nullable void (^)(NSURLSessionDataTask * _Nullable task, NSError *error))failure;
 
 /** 创建 PUT 请求并运行 NSURLSessionDataTask
+ * @note PUT请求: 向指定资源位置上传其最新内容;
  * @see -dataTaskWithRequest:completionHandler:
  */
 - (nullable NSURLSessionDataTask *)PUT:(NSString *)URLString
@@ -127,8 +132,9 @@ NS_ASSUME_NONNULL_BEGIN
                                failure:(nullable void (^)(NSURLSessionDataTask * _Nullable task, NSError *error))failure;
 
 /** 创建 PATCH 请求并运行 NSURLSessionDataTask
+ * @note PATCH请求 : 用来将局部修改应用于某一资源，添加于规范RFC5789 ;
  * @see -dataTaskWithRequest:completionHandler:
- */
+*/
 - (nullable NSURLSessionDataTask *)PATCH:(NSString *)URLString
                               parameters:(nullable id)parameters
                                  headers:(nullable NSDictionary <NSString *, NSString *> *)headers
@@ -136,6 +142,7 @@ NS_ASSUME_NONNULL_BEGIN
                                  failure:(nullable void (^)(NSURLSessionDataTask * _Nullable task, NSError *error))failure;
 
 /** 创建 DELETE 请求并运行 NSURLSessionDataTask
+ * @note DELETE 请求：服务器删除 URI 所标识的资源
  * @see -dataTaskWithRequest:completionHandler:
  */
 - (nullable NSURLSessionDataTask *)DELETE:(NSString *)URLString

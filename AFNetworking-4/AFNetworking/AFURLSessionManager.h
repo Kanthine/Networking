@@ -94,7 +94,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// @name Managing Security Policy
 ///-------------------------------
 
-/** 验证 HTTPS 请求的证书是否有效，如果 APP 中有一些敏感信息或者涉及交易信息，一定要使用 HTTPS 来保证交易或者用户信息的安全。
+
+/** 验证 HTTPS 请求的证书是否有效，涉及用户敏感或隐私数据或金融信息的应用全部网络连接最好采用SSL的HTTPS连接。
  * AFSSLPinningModeNone  不使用固定证书（本地）验证服务器。直接从客户端系统中的受信任颁发机构 CA 列表中去验证
  * AFSSLPinningModePublicKey 对服务器返回的证书中的PublicKey进行验证，通过则通过，否则不通过
  * AFSSLPinningModeCertificate 对服务器返回的证书同本地证书全部进行校验，通过则通过，否则不通过

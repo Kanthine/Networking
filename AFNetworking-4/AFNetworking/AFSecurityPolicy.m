@@ -24,21 +24,53 @@
 #import <AssertMacros.h>
 
 #if !TARGET_OS_IOS && !TARGET_OS_WATCH && !TARGET_OS_TV
+
+/** 函数 SecItemExport()
+ * 该函数接受一个或多个 SecItemRefs，并以 CFDataRef 的形式创建 item(s) 的外部表示。
+ * 调用者通过 SecExternalFormat enum 指定外部表示的格式。
+ * 调用者指定格式为 kSecFormatUnknown，将使用导出项的默认格式(如SecExternalFormat enums中所述)。
+ * PEM armouring 是可选的，由 importFlags 中的 kSecItemPemArmour flag指定。
+ *
+ * 如果要精确地导出一个 item ，则 keychainItemOrArray 参数可以是 SecKeychainItem；否则，此参数为 CFArrayRef，包含许多 SecKeychainItems ！
+ *
+ * 导出的 item(s) 通过 CFDataRef *exportedData 参数返回给调用者；调用者需要注意释放这些结果！
+ *
+ * 以下的 SecKeychainItems 可被导出:
+ *  <ul>
+ *     <li> SecCertificateRef
+ *     <li> SecKeyRef
+ *     <li> SecIdentityRef
+ *  </ul>
+ *
+ * 密钥相关 SecItemExport 字段
+ * -----------------------------------------------
+ *
+ * 当以一种 wrapped 格式(kSecFormatWrappedOpenSSL、kSecFormatWrappedSSH、kSecFormatWrappedPKCS8)或 PKCS12 格式导出 SecKeyRefs 时，调用者必须显式指定 passphrase 字段或在 SecKeyImportExportFlags 中设置 kSecKeySecurePassphrase 位。
+ *
+ * 如果选择了 kSecKeySecurePassphrase ，调用者可以有选择地为 passphrase panel 的标题栏和通过 SecItemImportExportKeyParameters 中的 alertTitle 和 alertPrompt 字段在 panel via 显示的提示指定字符串。
+ *
+ * 如果指定了显式口令，请注意 PKCS12 显式要求口令为 Unicode 格式;传入 CFStringRef 作为密码短语是确保满足此要求(并且结果将与其他实现兼容)的最安全的方法。
+ * 如果CFDataRef作为PKCS12导出操作的口令提供，则假定引用数据为UTF8形式，并将根据需要进行转换。 *
+ * 如果没有导出 key items ，则keyParams参数可以为NULL。
+ *
+ 
+OSStatus SecItemExport(CFTypeRef secItemOrArray,SecExternalFormat outputFormat,SecItemImportExportFlags flags,
+ const SecItemImportExportKeyParameters * __nullable keyParams, CFDataRef * __nonnull CF_RETURNS_RETAINED exportedData);
+ *
+*/
+
 //主要是把key到出为NSData
 static NSData * AFSecKeyGetData(SecKeyRef key) {
     CFDataRef data = NULL;
-
     __Require_noErr_Quiet(SecItemExport(key, kSecFormatUnknown, kSecItemPemArmour, NULL, &data), _out);
-
     return (__bridge_transfer NSData *)data;
-
 _out:
     if (data) {
         CFRelease(data);
     }
-
     return nil;
 }
+
 #endif
 //这个方法是比较两个key是否相等，如果是ios/watch/tv直接使用isEqual方法就可进行比较。应为SecKeyRef本质上是一个struct，是不能直接用isEqual比较的，正好使用上边的那个方法把它转为NSData就可以了。
 static BOOL AFSecKeyIsEqualToKey(SecKeyRef key1, SecKeyRef key2) {
