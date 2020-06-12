@@ -77,11 +77,10 @@ NS_ASSUME_NONNULL_BEGIN
 /** 网络会话 */
 @property (readonly, nonatomic, strong) NSURLSession *session;
 
-/** 委托回调的操作队列
- 
- operationQueue 为何默认设置为 1 ？
- 1、众所周知，AF2.x所有的回调是在一条线程，这条线程是AF的常驻线程，而这一条线程正是AF调度request的思想精髓所在，所以第一个目的就是为了和之前版本保持一致。
- 2、因为跟代理相关的一些操作AF都使用了NSLock。所以就算Queue的并发数设置为n，因为多线程回调，锁的等待，导致所提升的程序速度也并不明显。反而多task回调导致的多线程并发，平白浪费了部分性能。
+/** 为 NSURLSession 配置的操作队列
+ * 默认最大并发数为 1 ！ 为何为 1 ？
+ * 1、AF2.x 所有的回调是在一条线程，这条线程是AF的常驻线程，而这一条线程正是AF调度request的思想精髓所在，所以第一个目的就是为了和之前版本保持一致。
+ * 2、因为跟代理相关的一些操作AF都使用了NSLock。所以就算Queue的并发数设置为n，因为多线程回调，锁的等待，导致所提升的程序速度也并不明显。反而多task回调导致的多线程并发，平白浪费了部分性能。
  而设置Queue的并发数为1，（注：这里虽然回调Queue的并发数为1，仍然会有不止一条线程，但是因为是串行回调，所以同一时间，只会有一条线程在操作AFUrlSessionManager的那些方法。）至少回调的事件，是不需要多线程并发的。回调没有了NSLock的等待时间，所以对时间并没有多大的影响。（注：但是还是会有多线程的操作的，因为设置刚开始调起请求的时候，是在主线程的，而回调则是串行分线程。）
  */
 @property (readonly, nonatomic, strong) NSOperationQueue *operationQueue;

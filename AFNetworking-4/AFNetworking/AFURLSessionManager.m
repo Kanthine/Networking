@@ -99,6 +99,8 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
 
 #pragma mark -
 
+/** 代理：
+ */
 @interface AFURLSessionManagerTaskDelegate : NSObject <NSURLSessionTaskDelegate, NSURLSessionDataDelegate, NSURLSessionDownloadDelegate>
 - (instancetype)initWithTask:(NSURLSessionTask *)task;
 @property (nonatomic, weak) AFURLSessionManager *manager;//弱引用
@@ -355,8 +357,7 @@ didFinishDownloadingToURL:(NSURL *)location
 
 #pragma mark -
 
-/**
- *  A workaround for issues related to key-value observing the `state` of an `NSURLSessionTask`.
+/** 解决 NSURLSessionTask 的 state 相关的键值问题
  *
  *  See:
  *  - https://github.com/AFNetworking/AFNetworking/issues/1477
@@ -454,7 +455,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
     return NSURLSessionTaskStateCanceling;
 }
 
-//被替换掉的方法，只要有TASK开启或者暂停，都会执行
+//被替换掉的方法，只要 Task 开启或者暂停，都会执行
 - (void)af_resume {
     NSAssert([self respondsToSelector:@selector(state)], @"Does not respond to state");
     NSURLSessionTaskState state = [self state];
@@ -518,10 +519,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
     return [self initWithSessionConfiguration:nil];
 }
 
-/*
-可以看到，这就是最终的初始化方法了：在这里给一些属性赋值
-这里需要说明的是：
-self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并发数为何为 1？
+/**
 */
 - (instancetype)initWithSessionConfiguration:(NSURLSessionConfiguration *)configuration {
     self = [super init];
@@ -535,7 +533,6 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
     }
 
     self.sessionConfiguration = configuration;
-
     self.operationQueue = [[NSOperationQueue alloc] init];
     self.operationQueue.maxConcurrentOperationCount = 1;
 
@@ -570,7 +567,6 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
             [self addDelegateForDownloadTask:downloadTask progress:nil destination:nil completionHandler:nil];
         }
     }];
-
     return self;
 }
 
@@ -581,7 +577,6 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
 #pragma mark -
 
 - (NSURLSession *)session {
-    
     @synchronized (self) {
         if (!_session) {
             _session = [NSURLSession sessionWithConfiguration:self.sessionConfiguration delegate:self delegateQueue:self.operationQueue];
@@ -621,38 +616,34 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
 
 #pragma mark -
 
+/** 可变字典 mutableTaskDelegatesKeyedByTaskIdentifier
+ * key   :  NSURLSessionTask.taskIdentifier
+ * value :  AFURLSessionManagerTaskDelegate
+ *
+ * 可变字典不是线程安全的，存取键值时，需要加锁
+ */
+
 - (AFURLSessionManagerTaskDelegate *)delegateForTask:(NSURLSessionTask *)task {
     NSParameterAssert(task);
-
     AFURLSessionManagerTaskDelegate *delegate = nil;
     [self.lock lock];
     delegate = self.mutableTaskDelegatesKeyedByTaskIdentifier[@(task.taskIdentifier)];
     [self.lock unlock];
-
     return delegate;
 }
 
-/*
-这个方法主要就是把AF代理和task建立映射，存在了一个我们事先声明好的字典里。
-而要加锁的原因是因为本身我们这个字典属性是mutable的，是线程不安全的。而我们对这些方法的调用，确实是会在复杂的多线程环境中，后面会仔细提到线程问题
-*/
-- (void)setDelegate:(AFURLSessionManagerTaskDelegate *)delegate
-            forTask:(NSURLSessionTask *)task
-{
+/** 将 AF代理和task建立映射 */
+- (void)setDelegate:(AFURLSessionManagerTaskDelegate *)delegate forTask:(NSURLSessionTask *)task{
     NSParameterAssert(task);
-    NSParameterAssert(delegate); //断言，如果没有这个参数，debug下crash在这
-
-    [self.lock lock];//加锁保证字典线程安全
-    
-    //taskIdentifier 此任务的标识符，由所属会话分配且唯一
-    // 将AF delegate放入以taskIdentifier标记的词典中
+    NSParameterAssert(delegate);
+    [self.lock lock];
+    //taskIdentifier 由所属会话分配且唯一的任务标识符，
     self.mutableTaskDelegatesKeyedByTaskIdentifier[@(task.taskIdentifier)] = delegate;
     [self addNotificationObserverForTask:task];//添加task开始和暂停的通知
     [self.lock unlock];
 }
 
-/*
-总结一下:
+/** 总结一下:
 1）这个方法，生成了一个AFURLSessionManagerTaskDelegate,这个其实就是AF的自定义代理。我们请求传来的参数，都赋值给这个AF的代理了。
 2）delegate.manager = self;代理把AFURLSessionManager这个类作为属性了,我们可以看到：
    @property (nonatomic, weak) AFURLSessionManager *manager;
@@ -660,19 +651,18 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
 3）我们调用了[self setDelegate:delegate forTask:dataTask];
 */
 - (void)addDelegateForDataTask:(NSURLSessionDataTask *)dataTask
-                uploadProgress:(nullable void (^)(NSProgress *uploadProgress)) uploadProgressBlock
-              downloadProgress:(nullable void (^)(NSProgress *downloadProgress)) downloadProgressBlock
-             completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler
-{
+                uploadProgress:(nullable void (^)(NSProgress *uploadProgress))uploadProgressBlock
+              downloadProgress:(nullable void (^)(NSProgress *downloadProgress))downloadProgressBlock
+             completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler{
+    
     AFURLSessionManagerTaskDelegate *delegate = [[AFURLSessionManagerTaskDelegate alloc] initWithTask:dataTask];
     delegate.manager = self;// AFURLSessionManagerTaskDelegate与AFURLSessionManager建立相互关系
     delegate.completionHandler = completionHandler;
 
-    //这个taskDescriptionForSessionTasks用来发送开始和挂起通知的时候会用到,就是用这个值来Post通知，来两者对应
+    //这个taskDescriptionForSessionTasks用来发送开始和挂起通知的时候会用到,就是用这个值来 Post 通知，来两者对应
     //任务描述：值为 session 的内存地址
     dataTask.taskDescription = self.taskDescriptionForSessionTasks;
-    [self setDelegate:delegate forTask:dataTask];// ***** 将AF delegate对象与 dataTask建立关系
-    
+    [self setDelegate:delegate forTask:dataTask]; /** 将 AF代理和task建立映射 */
     
     // 设置AF delegate的上传进度，下载进度块。
     delegate.uploadProgressBlock = uploadProgressBlock;
@@ -681,24 +671,19 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
 
 - (void)addDelegateForUploadTask:(NSURLSessionUploadTask *)uploadTask
                         progress:(void (^)(NSProgress *uploadProgress)) uploadProgressBlock
-               completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler
-{
+               completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler{
     AFURLSessionManagerTaskDelegate *delegate = [[AFURLSessionManagerTaskDelegate alloc] initWithTask:uploadTask];
     delegate.manager = self;
     delegate.completionHandler = completionHandler;
-
     uploadTask.taskDescription = self.taskDescriptionForSessionTasks;
-
     [self setDelegate:delegate forTask:uploadTask];
-
     delegate.uploadProgressBlock = uploadProgressBlock;
 }
 
 - (void)addDelegateForDownloadTask:(NSURLSessionDownloadTask *)downloadTask
                           progress:(void (^)(NSProgress *downloadProgress)) downloadProgressBlock
                        destination:(NSURL * (^)(NSURL *targetPath, NSURLResponse *response))destination
-                 completionHandler:(void (^)(NSURLResponse *response, NSURL *filePath, NSError *error))completionHandler
-{
+                 completionHandler:(void (^)(NSURLResponse *response, NSURL *filePath, NSError *error))completionHandler{
     AFURLSessionManagerTaskDelegate *delegate = [[AFURLSessionManagerTaskDelegate alloc] initWithTask:downloadTask];
     delegate.manager = self;
     delegate.completionHandler = completionHandler;
@@ -710,16 +695,13 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
     }
 
     downloadTask.taskDescription = self.taskDescriptionForSessionTasks;
-
     [self setDelegate:delegate forTask:downloadTask];
-
     delegate.downloadProgressBlock = downloadProgressBlock;
 }
 
 ///把这个AF的代理和task的绑定解除了，并且移除了相关的progress和通知：
 - (void)removeDelegateForTask:(NSURLSessionTask *)task {
     NSParameterAssert(task);
-
     [self.lock lock];
     [self removeNotificationObserverForTask:task];
     [self.mutableTaskDelegatesKeyedByTaskIdentifier removeObjectForKey:@(task.taskIdentifier)];
@@ -728,26 +710,13 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
 
 #pragma mark -
 
-/*
-问题描述：
-假设现在系统有两个空闲资源可以被利用，但同一时间却有三个线程要进行访问，这种情况下，该如何处理呢？
-我们这里也可以用信号量控制一下最大开辟线程数。
-
-信号量：就是一种可用来控制访问资源的数量的标识，设定了一个信号量，在线程访问之前，加上信号量的处理，则可告知系统按照我们指定的信号量数量来执行多个线程。
-
-*/
+/** 异步的获取当前session的所有未完成的 task
+ * 在初始化中调用这个方法应该里面一个task都不会有。那么为什么要这么做呢？
+ * 这是为了防止后台回来，重新初始化这个session，一些之前的后台请求任务，导致程序的crash。
+ */
 - (NSArray *)tasksForKeyPath:(NSString *)keyPath {
     __block NSArray *tasks = nil;
-    
-    //创建信号量，参数：信号量的初值，如果小于0则会返回NULL
-    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-    
-    /*
-       异步的获取当前session的所有未完成的task
-       在初始化中调用这个方法应该里面一个task都不会有。那么为什么要这么做呢？
-       这是为了防止后台回来，重新初始化这个session，一些之前的后台请求任务，导致程序的crash。
-       */
-    
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);//信号量值为0
     [self.session getTasksWithCompletionHandler:^(NSArray *dataTasks, NSArray *uploadTasks, NSArray *downloadTasks) {
         if ([keyPath isEqualToString:NSStringFromSelector(@selector(dataTasks))]) {
             tasks = dataTasks;
@@ -758,12 +727,9 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
         } else if ([keyPath isEqualToString:NSStringFromSelector(@selector(tasks))]) {
             tasks = [@[dataTasks, uploadTasks, downloadTasks] valueForKeyPath:@"@unionOfArrays.self"];//数组合并
         }
-
-        dispatch_semaphore_signal(semaphore);//提高信号量
+        dispatch_semaphore_signal(semaphore);
     }];
-    //等待降低信号量（信号量，等待时间）
     dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
-
     return tasks;
 }
 
@@ -785,6 +751,11 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
 
 #pragma mark -
 //当对 session invalidate 后，就不能再创建新的 task 了，
+
+/** 使 NSURLSession 会话无效：可选地取消挂起的任务并可选地重置指定会话。
+ * @param cancelPendingTasks  是否取消挂起的任务
+ * @param resetSession    是否重置 NSURLSession
+ */
 - (void)invalidateSessionCancelingTasks:(BOOL)cancelPendingTasks resetSession:(BOOL)resetSession {
     if (cancelPendingTasks) {
         [self.session invalidateAndCancel];//直接取消所有正在执行的 task。
@@ -801,7 +772,6 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
 
 - (void)setResponseSerializer:(id <AFURLResponseSerialization>)responseSerializer {
     NSParameterAssert(responseSerializer);
-
     _responseSerializer = responseSerializer;
 }
 
@@ -817,13 +787,13 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
     [[NSNotificationCenter defaultCenter] removeObserver:self name:AFNSURLSessionTaskDidResumeNotification object:task];
 }
 
-#pragma mark -
+#pragma mark - 任务的创建
 
-/*
-为什么我们不直接去调用 dataTask = [self.session dataTaskWithRequest:request]; ?
-非要绕这么一圈，我们点进去bug日志里看看，原来这是为了适配iOS8的以下，创建session的时候，偶发的情况会出现session的属性taskIdentifier这个值不唯一，而这个taskIdentifier是我们后面来映射delegate的key,所以它必须是唯一的。
-具体原因应该是NSURLSession内部去生成task的时候是用多线程并发去执行的。想通了这一点，我们就很好解决了，我们只需要在iOS8以下同步串行的去生成task就可以防止这一问题发生（如果还是不理解同步串行的原因，可以看看注释）。
-题外话：很多同学都会抱怨为什么sync我从来用不到，看，有用到的地方了吧，很多东西不是没用，而只是你想不到怎么用。
+/** 为什么我们不直接去调用 [self.session dataTaskWithRequest:request];
+ * 这是为了适配iOS8的以下，创建session的时候，偶发的情况会出现session的属性 taskIdentifier这个值不唯一，
+ * 这个 taskIdentifier 作为映射的key,必须是唯一的。
+ * 具体原因应该是NSURLSession内部去生成task的时候是用多线程并发去执行的。
+ * 只需要在iOS8以下同步串行的去生成task就可以防止这一问题发生（如果还是不理解同步串行的原因，可以看看注释）。
 */
 - (NSURLSessionDataTask *)dataTaskWithRequest:(NSURLRequest *)request
                                uploadProgress:(nullable void (^)(NSProgress *uploadProgress)) uploadProgressBlock
@@ -831,64 +801,47 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
                             completionHandler:(nullable void (^)(NSURLResponse *response, id _Nullable responseObject,  NSError * _Nullable error))completionHandler {
 
     NSURLSessionDataTask *dataTask = [self.session dataTaskWithRequest:request];
-
     [self addDelegateForDataTask:dataTask uploadProgress:uploadProgressBlock downloadProgress:downloadProgressBlock completionHandler:completionHandler];
-
     return dataTask; //到这里我们整个对task的处理就完成了。
 }
 
-#pragma mark -
-
+//上传任务
 - (NSURLSessionUploadTask *)uploadTaskWithRequest:(NSURLRequest *)request
                                          fromFile:(NSURL *)fileURL
                                          progress:(void (^)(NSProgress *uploadProgress)) uploadProgressBlock
-                                completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler
-{
+                                completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler{
     NSURLSessionUploadTask *uploadTask = [self.session uploadTaskWithRequest:request fromFile:fileURL];
     
     if (uploadTask) {
-        [self addDelegateForUploadTask:uploadTask
-                              progress:uploadProgressBlock
-                     completionHandler:completionHandler];
+        [self addDelegateForUploadTask:uploadTask progress:uploadProgressBlock completionHandler:completionHandler];
     }
-
     return uploadTask;
 }
 
 - (NSURLSessionUploadTask *)uploadTaskWithRequest:(NSURLRequest *)request
                                          fromData:(NSData *)bodyData
                                          progress:(void (^)(NSProgress *uploadProgress)) uploadProgressBlock
-                                completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler
-{
+                                completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler{
     NSURLSessionUploadTask *uploadTask = [self.session uploadTaskWithRequest:request fromData:bodyData];
-    
     [self addDelegateForUploadTask:uploadTask progress:uploadProgressBlock completionHandler:completionHandler];
-
     return uploadTask;
 }
 
 - (NSURLSessionUploadTask *)uploadTaskWithStreamedRequest:(NSURLRequest *)request
                                                  progress:(void (^)(NSProgress *uploadProgress)) uploadProgressBlock
-                                        completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler
-{
+                                        completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler{
     NSURLSessionUploadTask *uploadTask = [self.session uploadTaskWithStreamedRequest:request];
-
     [self addDelegateForUploadTask:uploadTask progress:uploadProgressBlock completionHandler:completionHandler];
-
     return uploadTask;
 }
 
-#pragma mark -
-
+//下载任务
 - (NSURLSessionDownloadTask *)downloadTaskWithRequest:(NSURLRequest *)request
                                              progress:(void (^)(NSProgress *downloadProgress)) downloadProgressBlock
                                           destination:(NSURL * (^)(NSURL *targetPath, NSURLResponse *response))destination
-                                    completionHandler:(void (^)(NSURLResponse *response, NSURL *filePath, NSError *error))completionHandler
-{
+                                    completionHandler:(void (^)(NSURLResponse *response, NSURL *filePath, NSError *error))completionHandler{
     NSURLSessionDownloadTask *downloadTask = [self.session downloadTaskWithRequest:request];
-    
     [self addDelegateForDownloadTask:downloadTask progress:downloadProgressBlock destination:destination completionHandler:completionHandler];
-
     return downloadTask;
 }
 
@@ -898,89 +851,143 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
                                        completionHandler:(void (^)(NSURLResponse *response, NSURL *filePath, NSError *error))completionHandler
 {
     NSURLSessionDownloadTask *downloadTask = [self.session downloadTaskWithResumeData:resumeData];
-
     [self addDelegateForDownloadTask:downloadTask progress:downloadProgressBlock destination:destination completionHandler:completionHandler];
-
     return downloadTask;
 }
 
 #pragma mark -
+
+//获取任务的上传进度
 - (NSProgress *)uploadProgressForTask:(NSURLSessionTask *)task {
     return [[self delegateForTask:task] uploadProgress];
 }
 
+//获取任务的下载进度
 - (NSProgress *)downloadProgressForTask:(NSURLSessionTask *)task {
     return [[self delegateForTask:task] downloadProgress];
 }
 
-#pragma mark -
+#pragma mark - 设置一些回调 Block
 
+/** NSURLSession 无效时执行的Block
+ *@note 在 NSURLSessionDelegate 的 -URLSession:didBecomeInvalidWithError: 方法中调用
+ */
 - (void)setSessionDidBecomeInvalidBlock:(void (^)(NSURLSession *session, NSError *error))block {
     self.sessionDidBecomeInvalid = block;
 }
 
+/** NSURLSession 需要验证身份要执行的Block
+ * @note 在 NSURLSessionDelegate 的 -URLSession:didReceiveChallenge:completionHandler: 方法中调用
+ *
+ * @warning 自己实现 AuthenticationChallenge 完全绕过了AFNetworking在 AFSecurityPolicy 中定义的安全策略。
+ *       在实现自定义 AuthenticationChallenge 之前，请确保充分理解其中的含义。
+ *       如果不想绕过 AFNetworking 的安全策略，可以使用 -setAuthenticationChallengeHandler:
+ *
+ * @see -securityPolicy
+* @see -setAuthenticationChallengeHandler:
+*/
 - (void)setSessionDidReceiveAuthenticationChallengeBlock:(NSURLSessionAuthChallengeDisposition (^)(NSURLSession *session, NSURLAuthenticationChallenge *challenge, NSURLCredential * __autoreleasing *credential))block {
     self.sessionDidReceiveAuthenticationChallenge = block;
 }
 
 #if !TARGET_OS_OSX
+//设置后台的回调
 - (void)setDidFinishEventsForBackgroundURLSessionBlock:(void (^)(NSURLSession *session))block {
     self.didFinishEventsForBackgroundURLSession = block;
 }
 #endif
 
-#pragma mark -
 
+/** 当任务需要一个新的 BodyStream 发送到远程服务器时要执行的Block，
+ * @note 在 NSURLSessionTaskDelegate 的 -URLSession:task:needNewBodyStream: 方法中调用
+ */
 - (void)setTaskNeedNewBodyStreamBlock:(NSInputStream * (^)(NSURLSession *session, NSURLSessionTask *task))block {
     self.taskNeedNewBodyStream = block;
 }
 
+/** 当 HTTP 请求试图重定向到另一个URL时要执行的Block，
+ * @note 在 NSURLSessionTaskDelegate 的 -URLSession:willPerformHTTPRedirection:newRequest:completionHandler: 方法中调用
+ */
 - (void)setTaskWillPerformHTTPRedirectionBlock:(NSURLRequest * (^)(NSURLSession *session, NSURLSessionTask *task, NSURLResponse *response, NSURLRequest *request))block {
     self.taskWillPerformHTTPRedirection = block;
 }
 
+/** 设置一个定期执行的Block来监测上传进度
+ * @note 在 NSURLSessionTaskDelegate 的 -URLSession:task:didSendBodyData:totalBytesSent:totalbytesexpectedend: 方法中调用
+ * @param block 当不确定的字节数被上传到服务器时多次调用，并将在主线程上执行；
+ */
 - (void)setTaskDidSendBodyDataBlock:(void (^)(NSURLSession *session, NSURLSessionTask *task, int64_t bytesSent, int64_t totalBytesSent, int64_t totalBytesExpectedToSend))block {
     self.taskDidSendBodyData = block;
 }
 
+/**任务完成时要执行的Block，
+ * @note 在 NSURLSessionTaskDelegate 的 -URLSession:task:didCompleteWithError: 方法中调用
+ */
 - (void)setTaskDidCompleteBlock:(void (^)(NSURLSession *session, NSURLSessionTask *task, NSError *error))block {
     self.taskDidComplete = block;
 }
 
 #if AF_CAN_INCLUDE_SESSION_TASK_METRICS
+/** 当特定任务相关的 metrics 完成时要执行的Block
+ * @note 在 NSURLSessionTaskDelegate 的 -URLSession:task:didFinishCollectingMetrics: 方法中调用
+*/
 - (void)setTaskDidFinishCollectingMetricsBlock:(void (^)(NSURLSession * _Nonnull, NSURLSessionTask * _Nonnull, NSURLSessionTaskMetrics * _Nullable))block AF_API_AVAILABLE(ios(10), macosx(10.12), watchos(3), tvos(10)) {
     self.taskDidFinishCollectingMetrics = block;
 }
 #endif
 
-#pragma mark -
+#pragma mark -  设置 NSURLSessionDataDelegate 回调
 
+/** 接收到响应数据时要执行的Block
+ * @note 在 NSURLSessionDataDelegate 的 -URLSession:dataTask:didReceiveResponse:completionHandler: 方法中调用
+*/
 - (void)setDataTaskDidReceiveResponseBlock:(NSURLSessionResponseDisposition (^)(NSURLSession *session, NSURLSessionDataTask *dataTask, NSURLResponse *response))block {
     self.dataTaskDidReceiveResponse = block;
 }
 
+/** dataTask 变成 downloadTask 时执行的Block
+ * @note 在 NSURLSessionDataDelegate 的 -URLSession:dataTask:didBecomeDownloadTask: 方法中调用
+ */
 - (void)setDataTaskDidBecomeDownloadTaskBlock:(void (^)(NSURLSession *session, NSURLSessionDataTask *dataTask, NSURLSessionDownloadTask *downloadTask))block {
     self.dataTaskDidBecomeDownloadTask = block;
 }
 
+/** 接收到数据时要执行的Block
+ * @note 在 NSURLSessionDataDelegate 的 -URLSession:dataTask:didReceiveData: 方法中调用
+ * @param block 从服务器下载数据时被多次调用的Block ，将在 AFURLSessionManager.operationQueue 执行。
+ */
 - (void)setDataTaskDidReceiveDataBlock:(void (^)(NSURLSession *session, NSURLSessionDataTask *dataTask, NSData *data))block {
     self.dataTaskDidReceiveData = block;
 }
 
+/** 用于确定 dataTask 缓存行为的Block
+ * @note 在 NSURLSessionDataDelegate 的 -URLSession:dataTask:willCacheResponse:completionHandler: 方法中调用
+ */
 - (void)setDataTaskWillCacheResponseBlock:(NSCachedURLResponse * (^)(NSURLSession *session, NSURLSessionDataTask *dataTask, NSCachedURLResponse *proposedResponse))block {
     self.dataTaskWillCacheResponse = block;
 }
 
-#pragma mark -
+#pragma mark - 设置 NSURLSessionDownloadDelegate 回调
 
+/** downloadTask 完成下载后执行的Block
+ * @note 在 NSURLSessionDownloadDelegate 的 -URLSession:downloadTask:didFinishDownloadingToURL: 方法中调用
+ * @note 如果 fileManager 将临时文件移动到目的地时遇到错误，将发送通知 AFURLSessionDownloadTaskDidFailToMoveFileNotification ，字典 userInfo 包含下载任务，以及错误信息。
+ */
 - (void)setDownloadTaskDidFinishDownloadingBlock:(NSURL * (^)(NSURLSession *session, NSURLSessionDownloadTask *downloadTask, NSURL *location))block {
     self.downloadTaskDidFinishDownloading = block;
 }
 
+/** 一个定期执行的Block 用于监测下载进度
+ * @note 在 NSURLSessionDownloadDelegate 的 -URLSession:downloadTask:didWriteData:totalBytesWritten:totalBytesExpectedToWrite: 方法中调用
+ * @param block 从服务器下载数据时被多次调用的Block ，将在 AFURLSessionManager.operationQueue 执行。
+*/
 - (void)setDownloadTaskDidWriteDataBlock:(void (^)(NSURLSession *session, NSURLSessionDownloadTask *downloadTask, int64_t bytesWritten, int64_t totalBytesWritten, int64_t totalBytesExpectedToWrite))block {
     self.downloadTaskDidWriteData = block;
 }
 
+/** 中断的下载任务被恢复时要执行的Block
+ * @note 在 NSURLSessionDownloadDelegate 的 -URLSession:downloadTask:didResumeAtOffset:expectedTotalBytes: 方法中调用
+*/
 - (void)setDownloadTaskDidResumeBlock:(void (^)(NSURLSession *session, NSURLSessionDownloadTask *downloadTask, int64_t fileOffset, int64_t expectedTotalBytes))block {
     self.downloadTaskDidResume = block;
 }
@@ -991,12 +998,9 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
     return [NSString stringWithFormat:@"<%@: %p, session: %@, operationQueue: %@>", NSStringFromClass([self class]), self, self.session, self.operationQueue];
 }
 
-//是否相应一些方法
+//能否响应一些方法
 - (BOOL)respondsToSelector:(SEL)selector {
-    
     //复写了selector的方法，这几个方法是在本类有实现的，但是如果外面的Block没赋值的话，则返回NO，相当于没有实现！
-
-    
     if (selector == @selector(URLSession:didReceiveChallenge:completionHandler:)) {
         return self.sessionDidReceiveAuthenticationChallenge != nil;
     } else if (selector == @selector(URLSession:task:willPerformHTTPRedirection:newRequest:completionHandler:)) {
@@ -1012,7 +1016,6 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
     }
 #endif
     //这样如果没实现这些我们自定义的Block也不会去回调这些代理。因为本身某些代理，只执行了这些自定义的Block，如果Block都没有赋值，那我们调用代理也没有任何意义。
-
     return [[self class] instancesRespondToSelector:selector];
 }
 
@@ -1023,20 +1026,11 @@ self.operationQueue.maxConcurrentOperationCount = 1;operationQueue 的最大并�
 finishTasksAndInvalidate会等到正在执行的 task 执行完成，调用完所有回调或 delegate 后，释放对 delegate 的强引用
 invalidateAndCancel    直接取消所有正在执行的 task。
  */
-- (void)URLSession:(NSURLSession *)session
-didBecomeInvalidWithError:(NSError *)error
-{
+- (void)URLSession:(NSURLSession *)session didBecomeInvalidWithError:(NSError *)error{
     if (self.sessionDidBecomeInvalid) {
         self.sessionDidBecomeInvalid(session, error);
     }
-
     [[NSNotificationCenter defaultCenter] postNotificationName:AFURLSessionDidInvalidateNotification object:session];
-    
-    
-    /*
-     调用了一下我们自定义的Block,还发了一个失效的通知，至于这个通知有什么用。
-     很抱歉，AF没用它做任何事，只是发了...目的是用户自己可以利用这个通知做什么事吧。
-     */
 }
 
 /* NSURLProtectionSpace类的 authenticationMethod 属性则指明了服务端的验证方式，可能的值包括 :
