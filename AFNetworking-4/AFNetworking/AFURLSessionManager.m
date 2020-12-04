@@ -998,9 +998,11 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
     return [NSString stringWithFormat:@"<%@: %p, session: %@, operationQueue: %@>", NSStringFromClass([self class]), self, self.session, self.operationQueue];
 }
 
-//能否响应一些方法
+/** 能否响应某些方法
+ * 如果某个自定义的 Block 没有实现，那么就不调用它对应的代理方法；
+ * 因为代理方法内部仅仅调用该 Block ，如果Block都没有赋值，那我们调用代理方法也没有任何意义。
+ */
 - (BOOL)respondsToSelector:(SEL)selector {
-    //复写了selector的方法，这几个方法是在本类有实现的，但是如果外面的Block没赋值的话，则返回NO，相当于没有实现！
     if (selector == @selector(URLSession:didReceiveChallenge:completionHandler:)) {
         return self.sessionDidReceiveAuthenticationChallenge != nil;
     } else if (selector == @selector(URLSession:task:willPerformHTTPRedirection:newRequest:completionHandler:)) {
@@ -1015,7 +1017,6 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
         return self.didFinishEventsForBackgroundURLSession != nil;
     }
 #endif
-    //这样如果没实现这些我们自定义的Block也不会去回调这些代理。因为本身某些代理，只执行了这些自定义的Block，如果Block都没有赋值，那我们调用代理也没有任何意义。
     return [[self class] instancesRespondToSelector:selector];
 }
 
