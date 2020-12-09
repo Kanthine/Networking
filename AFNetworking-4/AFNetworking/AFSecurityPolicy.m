@@ -81,7 +81,7 @@ static BOOL AFSecKeyIsEqualToKey(SecKeyRef key1, SecKeyRef key2) {
 #endif
 }
 
-// 在证书中获取公钥
+/// 在证书中获取公钥
 static id AFPublicKeyForCertificate(NSData *certificate) {
     id allowedPublicKey = nil;
     SecCertificateRef allowedCertificate;
@@ -142,12 +142,10 @@ _out:
 static NSArray * AFCertificateTrustChainForServerTrust(SecTrustRef serverTrust) {
     CFIndex certificateCount = SecTrustGetCertificateCount(serverTrust);
     NSMutableArray *trustChain = [NSMutableArray arrayWithCapacity:(NSUInteger)certificateCount];
-
     for (CFIndex i = 0; i < certificateCount; i++) {
         SecCertificateRef certificate = SecTrustGetCertificateAtIndex(serverTrust, i);
         [trustChain addObject:(__bridge_transfer NSData *)SecCertificateCopyData(certificate)];
     }
-
     return [NSArray arrayWithArray:trustChain];
 }
 
@@ -260,20 +258,17 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
 
 #pragma mark -
 
-- (BOOL)evaluateServerTrust:(SecTrustRef)serverTrust
-                  forDomain:(NSString *)domain
-{
-    // 当使用自建证书验证域名时，需要使用AFSSLPinningModePublicKey或者AFSSLPinningModeCertificate进行验证
-
-    if (domain && self.allowInvalidCertificates && self.validatesDomainName && (self.SSLPinningMode == AFSSLPinningModeNone || [self.pinnedCertificates count] == 0)) {
-        // https://developer.apple.com/library/mac/documentation/NetworkingInternet/Conceptual/NetworkingTopics/Articles/OverridingSSLChainValidationCorrectly.html
-        //  According to the docs, you should only trust your provided certs for evaluation.
-        //  Pinned certificates are added to the trust. Without pinned certificates,
-        //  there is nothing to evaluate against.
-        //
+- (BOOL)evaluateServerTrust:(SecTrustRef)serverTrust forDomain:(NSString *)domain{
+    if (domain &&
+        self.allowInvalidCertificates &&
+        self.validatesDomainName &&
+        (self.SSLPinningMode == AFSSLPinningModeNone || [self.pinnedCertificates count] == 0)) {
+        //如果要验证自签名证书的域名，那么就不能用 AFSSLPinningModeNone 模式，而且服务器制作的证书必须在客户端保存一份
         //  From Apple Docs:
         //          "Do not implicitly trust self-signed certificates as anchors (kSecTrustOptionImplicitAnchors).
         //           Instead, add your own (self-signed) CA certificate to the list of trusted anchors."
+        
+        //如果要验证自签名证书的域名，那么就不能用 AFSSLPinningModeNone 模式，而且服务器制作的证书必须在客户端保存一份
         NSLog(@"In order to validate a domain name for self signed certificates, you MUST use pinning.");
         return NO;
     }
@@ -381,7 +376,6 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
     securityPolicy.allowInvalidCertificates = self.allowInvalidCertificates;
     securityPolicy.validatesDomainName = self.validatesDomainName;
     securityPolicy.pinnedCertificates = [self.pinnedCertificates copyWithZone:zone];
-
     return securityPolicy;
 }
 
